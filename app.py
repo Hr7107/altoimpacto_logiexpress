@@ -749,87 +749,79 @@ def combustivel_list():
 
 @app.route("/abastecimentos/novo", methods=["GET", "POST"])
 def combustivel_novo():
-   
     if request.method == "POST":
+        veiculo = request.form.get("veiculo")
         data = request.form.get("data")
-        litros = request.form.get("litros")
-        valor_total = request.form.get("valor total")
-        quilometragem = request.form.get("quilometragem")
         posto = request.form.get("posto")
-        
 
         # -------------------------------------------------
-        # Validações básicas
+        # Validações e Cálculos
         # -------------------------------------------------
-
-        if not nome or not documento or not cidade or not uf:
-            flash(
-                "Preencha todos os campos obrigatórios.",
-                "warning"
-            )
-            return render_template(
-                "clientes/form.html",
-                cliente=None
-            )
-
-        if len(uf) != 2 or not uf.isalpha():
-            flash(
-                "A UF deve possuir exatamente 2 letras.",
-                "warning"
-            )
-            return render_template(
-                "clientes/form.html",
-                cliente=None
-            )
-
-        # -------------------------------------------------
-        # Verifica se o documento já está cadastrado
-        # -------------------------------------------------
-
-        cliente_existente = Cliente.query.filter_by(
-            documento=documento
-        ).first()
-
-        if cliente_existente:
-            flash(
-                "Já existe um cliente cadastrado com este documento.",
-                "danger"
-            )
-            return render_template(
-                "clientes/form.html",
-                cliente=None
-            )
-
         try:
-            cliente = Cliente(
-                nome=nome,
-                documento=documento,
-                cidade=cidade,
-                uf=uf,
-                ativo=ativo
+            litros = float(request.form.get("litros"))
+            valor_total = float(request.form.get("valor_total"))
+            quilometragem = int(request.form.get("quilometragem"))
+
+            if litros <= 0 or valor_total <= 0:
+                flash("Erro: Litros e Valor Total devem ser maiores que zero.", "danger")
+                return render_template("abastecimentos/form.html", combustivel=None)
+            
+            if quilometragem < 0:
+                flash("Erro: A quilometragem não pode ser negativa.", "danger")
+                return render_template("abastecimentos/form.html", combustivel=None)
+
+            valor_por_litro = valor_total / litros
+
+        except ValueError:
+            # Captura erro caso o usuário digite texto no lugar de números
+            flash("Erro: Valores numéricos inválidos nos campos de litros, valor ou km.", "danger")
+            return render_template("abastecimentos/form.html", combustivel=None)
+
+        # -------------------------------------------------
+        # Inserção no Banco de Dados
+        # -------------------------------------------------
+        try:
+            # Substitua 'Abastecimento' pelo nome exato da sua classe/modelo no banco
+            novo_abastecimento = combustivel(
+                veiculo=veiculo,
+                data=data,
+                posto=posto,
+                litros=litros,
+                valor_total=valor_total,
+                quilometragem=quilometragem,
+                valor_litro=valor_litro
             )
 
-            db.session.add(cliente)
+            db.session.add(novo_abastecimento)
             db.session.commit()
 
             flash(
-                "Cliente cadastrado com sucesso.",
+                f"Abastecimento registrado com sucesso! (R$ {valor_por_litro:.2f}/L)",
                 "success"
             )
 
-            return redirect(url_for("clientes_list"))
+            return redirect(url_for("abastecimentos_list"))
 
         except Exception as exc:
             db.session.rollback()
-
             flash(
-                f"Não foi possível cadastrar o cliente: {exc}",
+                f"Não foi possível registrar o abastecimento: {exc}",
                 "danger"
             )
 
     return render_template(
-        "clientes/form.html",
-        cliente=None
+        "abastecimentos/form.html",
+        combustivel=None
+    )
+
+@app.route("/abastecimentos/<int:combustivel_id>")
+def abastecimento_view(combustivel_id):
+
+    combustivel = db.get_or_404(combustivel, combustivel_id)
+
+    return render_template(
+        "combustivel/view.html",
+        combustivel=combustivel
     )
 
 
